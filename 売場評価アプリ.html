@@ -491,14 +491,20 @@
                 `https://${KINTONE_DOMAIN}/k/v1/app/form/fields.json?app=${KINTONE_APP_ID}`,
                 { headers: { 'X-Cybozu-API-Token': token } }
             );
-            if (!res.ok) throw new Error('店舗一覧の取得に失敗しました');
+            if (!res.ok) {
+                const errBody = await res.json().catch(() => ({}));
+                throw new Error(`店舗一覧の取得に失敗しました (${res.status}) ${errBody.message || ''}`);
+            }
             const data = await res.json();
             const field = data.properties?.[F_STORE];
-            if (!field || !field.options) return;
+            if (!field || !field.options) {
+                throw new Error(`kintoneに「${F_STORE}」という欄が見つかりませんでした`);
+            }
             const options = Object.values(field.options).sort((a, b) => Number(a.index) - Number(b.index));
             storeSelect.innerHTML = '<option value="">選択してください</option>' +
                 options.map(o => `<option value="${o.label}">${o.label}</option>`).join('');
             localStorage.setItem('kintoneStoreOptions', JSON.stringify(options.map(o => o.label)));
+            errorBox.style.display = 'none';
         } catch (e) {
             // 取得できない場合は、前回保存した一覧があればそれを使う
             const cached = JSON.parse(localStorage.getItem('kintoneStoreOptions') || 'null');
@@ -506,6 +512,8 @@
                 storeSelect.innerHTML = '<option value="">選択してください</option>' +
                     cached.map(label => `<option value="${label}">${label}</option>`).join('');
             }
+            errorBox.textContent = '店舗一覧の読み込みエラー: ' + e.message;
+            errorBox.style.display = 'block';
         }
     }
     if (savedKintoneToken) loadStoreOptions();

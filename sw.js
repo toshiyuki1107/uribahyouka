@@ -1,4 +1,4 @@
-const CACHE_NAME = 'uriba-hyoka-v1';
+const CACHE_NAME = 'uriba-hyoka-v2';
 const ASSETS = ['./売場評価アプリ.html', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', (event) => {
@@ -17,12 +17,16 @@ self.addEventListener('activate', (event) => {
     self.clients.claim();
 });
 
+// 常に最新のファイルを取りに行き、通信できない時だけ保存しておいた画面を使う
 self.addEventListener('fetch', (event) => {
     if (event.request.method !== 'GET') return;
     event.respondWith(
-        caches.match(event.request).then((cached) => {
-            if (cached) return cached;
-            return fetch(event.request).catch(() => cached);
-        })
+        fetch(event.request)
+            .then((res) => {
+                const resClone = res.clone();
+                caches.open(CACHE_NAME).then((cache) => cache.put(event.request, resClone));
+                return res;
+            })
+            .catch(() => caches.match(event.request))
     );
 });
