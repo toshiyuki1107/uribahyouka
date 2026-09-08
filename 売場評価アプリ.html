@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>売場評価アプリ</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#4a90e2">
+    <link rel="icon" href="icon-192.png">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Yu Gothic', sans-serif;
+            background: #f0f2f5;
+            color: #333;
+            max-width: 620px;
+            margin: 0 auto;
+            padding: 16px;
+        }
+        h1 {
+            text-align: center;
+            font-size: 1.4rem;
+            margin-bottom: 16px;
+            color: #1a1a2e;
+            padding: 16px 0 8px;
+        }
+        .card {
+            background: white;
+            border-radius: 14px;
+            padding: 18px;
+            margin-bottom: 14px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.07);
+        }
+        .card-title {
+            font-size: 0.85rem;
+            font-weight: bold;
+            color: #888;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .api-key-row {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .api-key-row input {
+            flex: 1;
+            padding: 10px 12px;
+            border: 1.5px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .api-key-row input:focus { border-color: #4a90e2; }
+        .btn-save {
+            padding: 10px 16px;
+            background: #4a90e2;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        .api-status {
+            font-size: 0.8rem;
+            margin-top: 6px;
+            color: #27ae60;
+            display: none;
+        }
+        .mode-toggle {
+            display: flex;
+            gap: 8px;
+        }
+        .mode-btn {
+            flex: 1;
+            padding: 12px 8px;
+            border: 1.5px solid #e0e0e0;
+            background: white;
+            border-radius: 10px;
+            font-size: 0.95rem;
+            font-weight: bold;
+            color: #888;
+            cursor: pointer;
+        }
+        .mode-btn.active {
+            border-color: #4a90e2;
+            background: #eef4fb;
+            color: #4a90e2;
+        }
+        .field-row {
+            display: flex;
+            gap: 10px;
+        }
+        .field-col { flex: 1; }
+        .field-label {
+            font-size: 0.8rem;
+            color: #888;
+            margin-bottom: 6px;
+        }
+        select, .text-input, textarea {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1.5px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            outline: none;
+            font-family: inherit;
+        }
+        select:focus, .text-input:focus, textarea:focus { border-color: #4a90e2; }
+        textarea { resize: vertical; min-height: 80px; }
+        .upload-label {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border: 2px dashed #c8d6e5;
+            border-radius: 12px;
+            padding: 28px 16px;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: #f8fafc;
+        }
+        .upload-label:hover { border-color: #4a90e2; background: #eef4fb; }
+        .upload-label input { display: none; }
+        .upload-icon { font-size: 2.5rem; margin-bottom: 8px; }
+        .upload-text { color: #666; font-size: 0.9rem; text-align: center; line-height: 1.5; }
+        #preview {
+            width: 100%;
+            border-radius: 10px;
+            margin-top: 12px;
+            display: none;
+            max-height: 300px;
+            object-fit: contain;
+        }
+        .btn-analyze {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(135deg, #4a90e2, #357abd);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 1.05rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: opacity 0.2s, transform 0.1s;
+            letter-spacing: 0.5px;
+        }
+        .btn-analyze:active { transform: scale(0.98); }
+        .btn-analyze:disabled { opacity: 0.5; cursor: not-allowed; }
+        .loading {
+            text-align: center;
+            padding: 24px;
+            display: none;
+        }
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #e0e0e0;
+            border-top-color: #4a90e2;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 12px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .loading-text { color: #666; font-size: 0.95rem; }
+        #results { display: none; }
+        .total-box {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 0;
+        }
+        .total-left { }
+        .total-label { font-size: 0.85rem; color: #888; margin-bottom: 2px; }
+        .total-score {
+            font-size: 3rem;
+            font-weight: bold;
+            color: #1a1a2e;
+            line-height: 1;
+        }
+        .total-score span { font-size: 1.2rem; color: #888; }
+        .total-change {
+            font-size: 0.9rem;
+            margin-top: 6px;
+        }
+        .score-up { color: #27ae60; font-weight: bold; }
+        .score-down { color: #e74c3c; font-weight: bold; }
+        .score-same { color: #95a5a6; }
+        .gauge-wrap { flex: 1; margin-left: 20px; }
+        .gauge-bg {
+            width: 100%;
+            height: 10px;
+            background: #f0f0f0;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .gauge-fill {
+            height: 100%;
+            border-radius: 10px;
+            background: linear-gradient(90deg, #4a90e2, #27ae60);
+            transition: width 0.8s ease;
+        }
+        .gauge-labels {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.7rem;
+            color: #aaa;
+            margin-top: 4px;
+        }
+        .detail-item {
+            padding: 14px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .detail-item:last-child { border-bottom: none; }
+        .detail-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+        .detail-name { font-weight: bold; font-size: 0.95rem; }
+        .detail-score-wrap { display: flex; align-items: baseline; gap: 6px; }
+        .detail-score { font-size: 1.3rem; font-weight: bold; color: #4a90e2; }
+        .detail-score-max { font-size: 0.8rem; color: #aaa; }
+        .detail-change { font-size: 0.8rem; }
+        .mini-bar-bg {
+            height: 6px;
+            background: #f0f0f0;
+            border-radius: 6px;
+            overflow: hidden;
+            margin-bottom: 8px;
+        }
+        .mini-bar-fill {
+            height: 100%;
+            border-radius: 6px;
+            background: linear-gradient(90deg, #4a90e2, #5ba8ff);
+        }
+        .detail-reason { font-size: 0.85rem; color: #555; line-height: 1.6; }
+        .item-count-badge {
+            display: inline-block;
+            background: #eef4fb;
+            color: #4a90e2;
+            font-size: 0.8rem;
+            padding: 2px 8px;
+            border-radius: 20px;
+            margin-bottom: 6px;
+            font-weight: bold;
+        }
+        .comment-box {
+            background: #f8fafc;
+            border-left: 4px solid #4a90e2;
+            border-radius: 0 8px 8px 0;
+            padding: 12px 14px;
+            font-size: 0.9rem;
+            line-height: 1.7;
+            color: #444;
+        }
+        .error-box {
+            background: #fff5f5;
+            border: 1px solid #fcc;
+            border-radius: 10px;
+            padding: 14px;
+            color: #c0392b;
+            font-size: 0.9rem;
+            margin-top: 12px;
+            display: none;
+        }
+        .kintone-status {
+            font-size: 0.85rem;
+            margin-top: 10px;
+            padding: 10px 12px;
+            border-radius: 8px;
+            display: none;
+        }
+        .kintone-status.ok { background: #f0fbf4; color: #27ae60; display: block; }
+        .kintone-status.ng { background: #fff5f5; color: #c0392b; display: block; }
+        .kintone-status.loading { background: #f8fafc; color: #888; display: block; }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+<h1>売場評価アプリ</h1>
+
+<div class="card">
+    <div class="card-title">Gemini APIキー</div>
+    <div class="api-key-row">
+        <input type="password" id="apiKey" placeholder="APIキーを入力してください" />
+        <button class="btn-save" onclick="saveApiKey()">保存</button>
+    </div>
+    <div class="api-status" id="apiStatus">✔ APIキーが保存されています</div>
+</div>
+
+<div class="card">
+    <div class="card-title">kintone連携用トークン</div>
+    <div class="api-key-row">
+        <input type="password" id="kintoneToken" placeholder="kintoneのAPIトークンを入力してください" />
+        <button class="btn-save" onclick="saveKintoneToken()">保存</button>
+    </div>
+    <div class="api-status" id="kintoneStatus">✔ トークンが保存されています</div>
+</div>
+
+<div class="card">
+    <div class="card-title">記録の種類</div>
+    <div class="mode-toggle">
+        <button type="button" class="mode-btn active" id="modeEvalBtn" onclick="setMode('eval')">売場評価</button>
+        <button type="button" class="mode-btn" id="modeGoodBtn" onclick="setMode('good')">良い取り組み</button>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-title">店舗・場所</div>
+    <div class="field-row">
+        <div class="field-col">
+            <div class="field-label">店舗名</div>
+            <select id="storeSelect">
+                <option value="">選択してください</option>
+            </select>
+        </div>
+        <div class="field-col">
+            <div class="field-label">場所番号</div>
+            <input class="text-input" type="number" inputmode="numeric" id="locationInput" placeholder="例：12" />
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-title" id="photoCardTitle">売場の写真</div>
+    <label class="upload-label">
+        <div class="upload-icon">📷</div>
+        <div class="upload-text">タップして写真を撮影 または<br>ファイルを選択</div>
+        <input type="file" id="imageInput" accept="image/*" capture="environment" />
+    </label>
+    <img id="preview" alt="プレビュー" />
+</div>
+
+<div class="card hidden" id="goodCommentCard">
+    <div class="card-title">コメント（どんな取り組みか）</div>
+    <textarea id="goodComment" placeholder="例：新商品の陳列を目立つ位置に変更しました"></textarea>
+</div>
+
+<button class="btn-analyze" id="analyzeBtn" disabled onclick="analyzeImage()">
+    評価する
+</button>
+
+<button class="btn-analyze hidden" id="goodSaveBtn" disabled onclick="saveGoodRecord()">
+    kintoneに保存する
+</button>
+
+<div class="error-box" id="errorBox"></div>
+<div class="kintone-status" id="kintoneSaveStatus"></div>
+
+<div class="loading" id="loadingSection">
+    <div class="spinner"></div>
+    <div class="loading-text" id="loadingText">AIが売場を分析しています…</div>
+</div>
+
+<div id="results">
+
+    <div class="card">
+        <div class="card-title">総合スコア</div>
+        <div class="total-box">
+            <div class="total-left">
+                <div class="total-label">今回のスコア</div>
+                <div class="total-score"><span id="totalScore">-</span><span>/100</span></div>
+                <div class="total-change" id="totalChange"></div>
+            </div>
+            <div class="gauge-wrap">
+                <div class="gauge-bg">
+                    <div class="gauge-fill" id="gaugeBar" style="width:0%"></div>
+                </div>
+                <div class="gauge-labels"><span>0</span><span>50</span><span>100</span></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-title">評価詳細</div>
+        <div id="detailResults"></div>
+    </div>
+
+    <div class="card">
+        <div class="card-title">総合コメント・改善提案</div>
+        <div class="comment-box" id="overallComment"></div>
+    </div>
+
+</div>
+
+<script>
+    // ==== kintoneの接続先（トークン以外はここに設定済み） ====
+    const KINTONE_DOMAIN = 'xsfof9rk0yj4.cybozu.com';
+    const KINTONE_APP_ID = '358';
+
+    // ==== kintoneの欄の名前（作成した欄の名前と完全に一致させてください） ====
+    const F_TYPE = '記録の種類';
+    const F_STORE = '店舗名';
+    const F_LOCATION = '売場番号';
+    const F_PHOTO = '売場写真';
+    const F_TOTAL = '総合スコア';
+    const F_DISPLAY_SCORE = '陳列状態スコア';
+    const F_DISPLAY_COMMENT = '陳列状態コメント';
+    const F_SPACE_SCORE = '空きスペーススコア';
+    const F_SPACE_COMMENT = '空きスペースコメント';
+    const F_PRICE_SCORE = '値札管理スコア';
+    const F_PRICE_COMMENT = '値札管理コメント';
+    const F_ITEM_SCORE = 'アイテム数スコア';
+    const F_ITEM_COUNT = '推定アイテム数';
+    const F_ITEM_COMMENT = 'アイテム数コメント';
+    const F_COMMENT = '総合コメント';
+
+    const TYPE_EVAL = '売場評価';
+    const TYPE_GOOD = '良い取り組み';
+
+    const apiKeyInput = document.getElementById('apiKey');
+    const apiStatus = document.getElementById('apiStatus');
+    const kintoneTokenInput = document.getElementById('kintoneToken');
+    const kintoneStatus = document.getElementById('kintoneStatus');
+    const imageInput = document.getElementById('imageInput');
+    const preview = document.getElementById('preview');
+    const analyzeBtn = document.getElementById('analyzeBtn');
+    const goodSaveBtn = document.getElementById('goodSaveBtn');
+    const loadingSection = document.getElementById('loadingSection');
+    const loadingText = document.getElementById('loadingText');
+    const resultsSection = document.getElementById('results');
+    const errorBox = document.getElementById('errorBox');
+    const kintoneSaveStatus = document.getElementById('kintoneSaveStatus');
+    const storeSelect = document.getElementById('storeSelect');
+    const locationInput = document.getElementById('locationInput');
+    const goodCommentCard = document.getElementById('goodCommentCard');
+    const goodComment = document.getElementById('goodComment');
+    const photoCardTitle = document.getElementById('photoCardTitle');
+    const modeEvalBtn = document.getElementById('modeEvalBtn');
+    const modeGoodBtn = document.getElementById('modeGoodBtn');
+
+    let currentMode = 'eval';
+
+    // ---- Gemini APIキーの保存・読み込み ----
+    const savedKey = localStorage.getItem('geminiApiKey');
+    if (savedKey) {
+        apiKeyInput.value = savedKey;
+        apiStatus.style.display = 'block';
+    }
+    function saveApiKey() {
+        const key = apiKeyInput.value.trim();
+        if (!key) { alert('APIキーを入力してください'); return; }
+        localStorage.setItem('geminiApiKey', key);
+        apiStatus.style.display = 'block';
+    }
+
+    // ---- kintoneトークンの保存・読み込み ----
+    const savedKintoneToken = localStorage.getItem('kintoneApiToken');
+    if (savedKintoneToken) {
+        kintoneTokenInput.value = savedKintoneToken;
+        kintoneStatus.style.display = 'block';
+    }
+    function saveKintoneToken() {
+        const token = kintoneTokenInput.value.trim();
+        if (!token) { alert('kintoneのAPIトークンを入力してください'); return; }
+        localStorage.setItem('kintoneApiToken', token);
+        kintoneStatus.style.display = 'block';
+        loadStoreOptions();
+    }
+    function getKintoneToken() {
+        return kintoneTokenInput.value.trim();
+    }
+
+    // ---- 記録の種類の切り替え ----
+    function setMode(mode) {
+        currentMode = mode;
+        modeEvalBtn.classList.toggle('active', mode === 'eval');
+        modeGoodBtn.classList.toggle('active', mode === 'good');
+        analyzeBtn.classList.toggle('hidden', mode !== 'eval');
+        goodSaveBtn.classList.toggle('hidden', mode !== 'good');
+        goodCommentCard.classList.toggle('hidden', mode !== 'good');
+        photoCardTitle.textContent = mode === 'eval' ? '売場の写真' : '取り組みの写真';
+        resultsSection.style.display = 'none';
+        errorBox.style.display = 'none';
+        kintoneSaveStatus.style.display = 'none';
+    }
+
+    // ---- 店舗一覧をkintoneから取得してプルダウンに反映 ----
+    async function loadStoreOptions() {
+        const token = getKintoneToken();
+        if (!token) return;
+        try {
+            const res = await fetch(
+                `https://${KINTONE_DOMAIN}/k/v1/app/form/fields.json?app=${KINTONE_APP_ID}`,
+                { headers: { 'X-Cybozu-API-Token': token } }
+            );
+            if (!res.ok) throw new Error('店舗一覧の取得に失敗しました');
+            const data = await res.json();
+            const field = data.properties?.[F_STORE];
+            if (!field || !field.options) return;
+            const options = Object.values(field.options).sort((a, b) => Number(a.index) - Number(b.index));
+            storeSelect.innerHTML = '<option value="">選択してください</option>' +
+                options.map(o => `<option value="${o.label}">${o.label}</option>`).join('');
+            localStorage.setItem('kintoneStoreOptions', JSON.stringify(options.map(o => o.label)));
+        } catch (e) {
+            // 取得できない場合は、前回保存した一覧があればそれを使う
+            const cached = JSON.parse(localStorage.getItem('kintoneStoreOptions') || 'null');
+            if (cached) {
+                storeSelect.innerHTML = '<option value="">選択してください</option>' +
+                    cached.map(label => `<option value="${label}">${label}</option>`).join('');
+            }
+        }
+    }
+    if (savedKintoneToken) loadStoreOptions();
+
+    // ---- 写真の読み込み ----
+    let imageBase64 = null;
+    let imageMimeType = 'image/jpeg';
+
+    imageInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        imageMimeType = file.type || 'image/jpeg';
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            imageBase64 = event.target.result.split(',')[1];
+            preview.src = event.target.result;
+            preview.style.display = 'block';
+            errorBox.style.display = 'none';
+
+            if (currentMode === 'eval') {
+                analyzeBtn.disabled = false;
+                if (apiKeyInput.value.trim() && checkStoreLocation(false)) {
+                    analyzeImage();
+                }
+            } else {
+                goodSaveBtn.disabled = false;
+            }
+        };
+        reader.readAsDataURL(file);
+    });
+
+    function checkStoreLocation(showAlert = true) {
+        const store = storeSelect.value;
+        const location = locationInput.value;
+        if (!store || location === '') {
+            if (showAlert) alert('店舗名と場所番号を入力してください');
+            return false;
+        }
+        return true;
+    }
+
+    // ---- 売場評価（Geminiで採点） ----
+    async function analyzeImage() {
+        const apiKey = apiKeyInput.value.trim();
+        if (!apiKey) { alert('Gemini APIキーを入力・保存してください'); return; }
+        if (!imageBase64) { alert('写真を選択してください'); return; }
+        if (!checkStoreLocation()) return;
+
+        analyzeBtn.disabled = true;
+        loadingText.textContent = 'AIが売場を分析しています…';
+        loadingSection.style.display = 'block';
+        resultsSection.style.display = 'none';
+        errorBox.style.display = 'none';
+        kintoneSaveStatus.style.display = 'none';
+
+        const prompt = `あなたは小売店の売場評価の専門家です。
+添付の売場写真を詳しく分析し、以下のJSON形式のみで返答してください（説明文は不要）。
+
+{
+  "陳列状態": {
+    "score": 0から25の整数,
+    "reason": "具体的な採点理由"
+  },
+  "空きスペース": {
+    "score": 0から25の整数,
+    "reason": "空きスペースの割合・場所を具体的に記載"
+  },
+  "値札": {
+    "score": 0から25の整数,
+    "reason": "値札がある・ない箇所を具体的に記載"
+  },
+  "アイテム数": {
+    "count": "約XX個",
+    "score": 0から25の整数,
+    "reason": "推定アイテム数と品揃えの評価"
+  },
+  "総合コメント": "売場全体の評価と具体的な改善提案"
+}
+
+採点基準：
+- 陳列状態（25点）：商品が整然と並び、フェイスが揃っているほど高得点
+- 空きスペース（25点）：棚に空きが少なく商品が充実しているほど高得点（空きが多いほど減点）
+- 値札（25点）：全商品に値札・プライスカードがあるほど高得点
+- アイテム数（25点）：品揃えが豊富なほど高得点`;
+
+        try {
+            const res = await fetch(
+                `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${apiKey}`,
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{
+                            parts: [
+                                { text: prompt },
+                                { inline_data: { mime_type: imageMimeType, data: imageBase64 } }
+                            ]
+                        }],
+                        generationConfig: { temperature: 0.1 }
+                    })
+                }
+            );
+
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.error?.message || `APIエラー (${res.status})`);
+            }
+
+            const data = await res.json();
+            const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+            const match = text.match(/\{[\s\S]*\}/);
+            if (!match) throw new Error('AIの応答を解析できませんでした。もう一度お試しください。');
+
+            const result = JSON.parse(match[0]);
+            await displayResults(result);
+
+        } catch (e) {
+            errorBox.textContent = 'エラー: ' + e.message;
+            errorBox.style.display = 'block';
+        } finally {
+            analyzeBtn.disabled = false;
+            loadingSection.style.display = 'none';
+        }
+    }
+
+    // ---- kintoneから同じ店舗・場所の前回記録を取得 ----
+    async function getPreviousKintoneRecord(store, location) {
+        const token = getKintoneToken();
+        if (!token) return null;
+        try {
+            const query = `${F_TYPE} = "${TYPE_EVAL}" and ${F_STORE} = "${store}" and ${F_LOCATION} = ${Number(location)} order by 作成日時 desc limit 1`;
+            const res = await fetch(
+                `https://${KINTONE_DOMAIN}/k/v1/records.json?app=${KINTONE_APP_ID}&query=${encodeURIComponent(query)}`,
+                { headers: { 'X-Cybozu-API-Token': token } }
+            );
+            if (!res.ok) return null;
+            const data = await res.json();
+            return data.records?.[0] || null;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    function previousResultFromRecord(record) {
+        if (!record) return null;
+        const num = (code) => Number(record[code]?.value || 0);
+        return {
+            '陳列状態': { score: num(F_DISPLAY_SCORE) },
+            '空きスペース': { score: num(F_SPACE_SCORE) },
+            '値札': { score: num(F_PRICE_SCORE) },
+            'アイテム数': { score: num(F_ITEM_SCORE) }
+        };
+    }
+
+    // ---- 結果表示（kintoneの前回記録と比較） ----
+    async function displayResults(result) {
+        const store = storeSelect.value;
+        const location = locationInput.value;
+        const prevRecord = await getPreviousKintoneRecord(store, location);
+        const prev = previousResultFromRecord(prevRecord);
+
+        const cats = ['陳列状態', '空きスペース', '値札', 'アイテム数'];
+        const total = cats.reduce((s, c) => s + (result[c]?.score || 0), 0);
+        const prevTotal = prev ? cats.reduce((s, c) => s + (prev[c]?.score || 0), 0) : null;
+
+        document.getElementById('totalScore').textContent = total;
+        document.getElementById('gaugeBar').style.width = total + '%';
+
+        const changeEl = document.getElementById('totalChange');
+        if (prevTotal !== null) {
+            const d = total - prevTotal;
+            if (d > 0) changeEl.innerHTML = `<span class="score-up">▲ ${d}点　前回より上昇（前回：${prevTotal}点）</span>`;
+            else if (d < 0) changeEl.innerHTML = `<span class="score-down">▼ ${Math.abs(d)}点　前回より下降（前回：${prevTotal}点）</span>`;
+            else changeEl.innerHTML = `<span class="score-same">→ 前回と同じ（${prevTotal}点）</span>`;
+        } else {
+            changeEl.innerHTML = `<span class="score-same">（この場所の前回データなし）</span>`;
+        }
+
+        document.getElementById('detailResults').innerHTML = cats.map(cat => {
+            const item = result[cat] || {};
+            const score = item.score || 0;
+            const prevScore = prev?.[cat]?.score;
+            const pct = (score / 25) * 100;
+
+            let changeHtml = '';
+            if (prevScore !== undefined) {
+                const d = score - prevScore;
+                if (d > 0) changeHtml = `<span class="score-up">▲${d}</span>`;
+                else if (d < 0) changeHtml = `<span class="score-down">▼${Math.abs(d)}</span>`;
+                else changeHtml = `<span class="score-same">→</span>`;
+            }
+
+            const countBadge = (cat === 'アイテム数' && item.count)
+                ? `<div class="item-count-badge">推定 ${item.count}</div>`
+                : '';
+
+            return `
+            <div class="detail-item">
+                <div class="detail-header">
+                    <span class="detail-name">${cat}</span>
+                    <div class="detail-score-wrap">
+                        <span class="detail-score">${score}</span>
+                        <span class="detail-score-max">/25</span>
+                        <span class="detail-change">${changeHtml}</span>
+                    </div>
+                </div>
+                <div class="mini-bar-bg"><div class="mini-bar-fill" style="width:${pct}%"></div></div>
+                ${countBadge}
+                <div class="detail-reason">${item.reason || ''}</div>
+            </div>`;
+        }).join('');
+
+        document.getElementById('overallComment').textContent = result['総合コメント'] || '';
+
+        resultsSection.style.display = 'block';
+        resultsSection.scrollIntoView({ behavior: 'smooth' });
+
+        // kintoneに保存
+        saveEvalToKintone(result, total);
+    }
+
+    // ---- kintoneへのファイルアップロード ----
+    function base64ToBlob(base64, mimeType) {
+        const byteChars = atob(base64);
+        const byteNumbers = new Array(byteChars.length);
+        for (let i = 0; i < byteChars.length; i++) byteNumbers[i] = byteChars.charCodeAt(i);
+        return new Blob([new Uint8Array(byteNumbers)], { type: mimeType });
+    }
+
+    async function uploadFileToKintone(base64, mimeType) {
+        const token = getKintoneToken();
+        const ext = mimeType.includes('png') ? 'png' : 'jpg';
+        const blob = base64ToBlob(base64, mimeType);
+        const formData = new FormData();
+        formData.append('file', blob, `photo_${Date.now()}.${ext}`);
+
+        const res = await fetch(`https://${KINTONE_DOMAIN}/k/v1/file.json`, {
+            method: 'POST',
+            headers: { 'X-Cybozu-API-Token': token },
+            body: formData
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.message || 'kintoneへの画像アップロードに失敗しました');
+        }
+        const data = await res.json();
+        return data.fileKey;
+    }
+
+    async function createKintoneRecord(fields) {
+        const token = getKintoneToken();
+        const res = await fetch(`https://${KINTONE_DOMAIN}/k/v1/record.json`, {
+            method: 'POST',
+            headers: {
+                'X-Cybozu-API-Token': token,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ app: KINTONE_APP_ID, record: fields })
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.message || 'kintoneへの保存に失敗しました');
+        }
+        return res.json();
+    }
+
+    async function saveEvalToKintone(result, total) {
+        const token = getKintoneToken();
+        if (!token) {
+            kintoneSaveStatus.className = 'kintone-status ng';
+            kintoneSaveStatus.textContent = 'kintoneのトークンが未設定のため、保存されていません。';
+            return;
+        }
+        kintoneSaveStatus.className = 'kintone-status loading';
+        kintoneSaveStatus.textContent = 'kintoneに保存しています…';
+        try {
+            const fileKey = await uploadFileToKintone(imageBase64, imageMimeType);
+            const fields = {
+                [F_TYPE]: { value: TYPE_EVAL },
+                [F_STORE]: { value: storeSelect.value },
+                [F_LOCATION]: { value: locationInput.value },
+                [F_PHOTO]: { value: [{ fileKey }] },
+                [F_TOTAL]: { value: String(total) },
+                [F_DISPLAY_SCORE]: { value: String(result['陳列状態']?.score ?? 0) },
+                [F_DISPLAY_COMMENT]: { value: result['陳列状態']?.reason || '' },
+                [F_SPACE_SCORE]: { value: String(result['空きスペース']?.score ?? 0) },
+                [F_SPACE_COMMENT]: { value: result['空きスペース']?.reason || '' },
+                [F_PRICE_SCORE]: { value: String(result['値札']?.score ?? 0) },
+                [F_PRICE_COMMENT]: { value: result['値札']?.reason || '' },
+                [F_ITEM_SCORE]: { value: String(result['アイテム数']?.score ?? 0) },
+                [F_ITEM_COUNT]: { value: result['アイテム数']?.count || '' },
+                [F_ITEM_COMMENT]: { value: result['アイテム数']?.reason || '' },
+                [F_COMMENT]: { value: result['総合コメント'] || '' }
+            };
+            await createKintoneRecord(fields);
+            kintoneSaveStatus.className = 'kintone-status ok';
+            kintoneSaveStatus.textContent = '✔ kintoneに保存しました';
+        } catch (e) {
+            kintoneSaveStatus.className = 'kintone-status ng';
+            kintoneSaveStatus.textContent = 'kintoneへの保存でエラー: ' + e.message;
+        }
+    }
+
+    // ---- 良い取り組みの保存 ----
+    async function saveGoodRecord() {
+        if (!imageBase64) { alert('写真を選択してください'); return; }
+        if (!checkStoreLocation()) return;
+
+        const token = getKintoneToken();
+        if (!token) { alert('kintoneのAPIトークンを入力・保存してください'); return; }
+
+        goodSaveBtn.disabled = true;
+        loadingText.textContent = 'kintoneに保存しています…';
+        loadingSection.style.display = 'block';
+        errorBox.style.display = 'none';
+        kintoneSaveStatus.style.display = 'none';
+
+        try {
+            const fileKey = await uploadFileToKintone(imageBase64, imageMimeType);
+            const fields = {
+                [F_TYPE]: { value: TYPE_GOOD },
+                [F_STORE]: { value: storeSelect.value },
+                [F_LOCATION]: { value: locationInput.value },
+                [F_PHOTO]: { value: [{ fileKey }] },
+                [F_COMMENT]: { value: goodComment.value || '' }
+            };
+            await createKintoneRecord(fields);
+            kintoneSaveStatus.className = 'kintone-status ok';
+            kintoneSaveStatus.textContent = '✔ kintoneに保存しました';
+            kintoneSaveStatus.style.display = 'block';
+            goodComment.value = '';
+            preview.style.display = 'none';
+            imageBase64 = null;
+        } catch (e) {
+            errorBox.textContent = 'エラー: ' + e.message;
+            errorBox.style.display = 'block';
+        } finally {
+            goodSaveBtn.disabled = false;
+            loadingSection.style.display = 'none';
+        }
+    }
+
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('sw.js').catch(() => {});
+        });
+    }
+</script>
+
+</body>
+</html>
